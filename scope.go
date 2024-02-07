@@ -421,13 +421,13 @@ func (s *scope) decorateRequest(req *http.Request) (*http.Request, url.Values) {
 		params.Set("query_id", s.id.String())
 		// Set session_timeout an idle timeout for session
 		params.Set("session_timeout", strconv.Itoa(s.sessionTimeout))
+		// Rewrite possible previous Basic Auth and send request
+		// as cluster user.
+		req.SetBasicAuth(s.clusterUser.name, s.clusterUser.password)
 	}
 
 	req.URL.RawQuery = params.Encode()
 
-	// Rewrite possible previous Basic Auth and send request
-	// as cluster user.
-	req.SetBasicAuth(s.clusterUser.name, s.clusterUser.password)
 	// Delete possible X-ClickHouse headers,
 	// it is not allowed to use X-ClickHouse HTTP headers and other authentication methods simultaneously
 	req.Header.Del("X-ClickHouse-User")
