@@ -811,6 +811,14 @@ func (rp *reverseProxy) refreshCacheMetrics() {
 	}
 }
 
+// noNeedAuth 检查请求是否未携带鉴权信息，未携带返回 true
+func noNeedAuth(name, password string) bool {
+	if name == defaultUser && password == "" {
+		return true
+	}
+	return false
+}
+
 // find user, cluster and clusterUser
 // in case of wildcarded user, cluster user is crafted to use original credentials
 func (rp *reverseProxy) getUser(name string, password string) (found bool, u *user, c *cluster, cu *clusterUser) {
@@ -820,10 +828,21 @@ func (rp *reverseProxy) getUser(name string, password string) (found bool, u *us
 	u = rp.users[name]
 	switch {
 	case u != nil:
-		found = (u.password == password)
+		// 如果未携带鉴权信息，则流量导向 chproxy 的 default 用户对应的集群
+		if noNeedAuth(name, password) {
+			found = true
+		} else {
+			found = (u.password == password)
+		}
+
 		// existence of c and cu for toCluster is guaranteed by applyConfig
 		c = rp.clusters[u.toCluster]
 		cu = c.users[u.toUser]
+
+		// 如果未携带鉴权信息，则把 cluster user 的 password 设置为空，避免被绕过
+		if noNeedAuth(name, password) {
+			cu.password = ""
+		}
 	case name == "" || name == defaultUser:
 		// default user can't work with the wildcarded feature for security reasons
 		found = false
